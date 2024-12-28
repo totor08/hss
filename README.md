@@ -1,5 +1,6 @@
 # hss
-```hss sert à gérer plusieurs connexions SSH vers des serveurs différents, avec des noms d’utilisateurs différents, des url différentes, des ports de connexion différent.
+```
+hss sert à gérer plusieurs connexions SSH vers des serveurs différents, avec des noms d’utilisateurs différents, des url différentes, des ports de connexion différent.
 Le tout est stocké dans une base de données sqlite3
 on peut ajouter, supprimer, renommer, lister les données
 la connexion à un serveur SSH se fait par un hss shortcut. Shortcut étant le nom du raccourci qu’on a donné à la création de la donnée. On peut renommer le shortcut.
