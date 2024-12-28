@@ -11,4 +11,5 @@ Usage :
   hss -d shortcut -> supprime la donnée de la base
   hss -a shortcut:user@url[/path]:port -> crée la donnée en base. Path est optionnel et permet de se connecter en ssh sur un dossier en particulier
   hss -r shortcut champs=valeur -> dans la donnée pointée par shortcut, on modifie le champ qui peut être shortcut,user,url ou port par une autre valeur
+  hss -s shortcut -> affiche une ligne de commande scp en exemple, il n’y manque que les fichiers et les options de scp
 ```
