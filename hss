@@ -1,0 +1,218 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+bdd = "~/.config/hss/hss.db"
+table = "item"
+
+# format de création de la table
+# CREATE TABLE item ( shortcut text UNIQUE, user text, url text, port integer )
+
+# longueur maxi de chaque data
+# select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item;
+
+import sqlite3,sys,re,os
+
+def usage():
+    print("""usage :
+    -l | --list                      display all bdd entries
+    -a | --add shortcut:user@url[/path]:port (ex servlog:foo@bar.tld/var/log:22)
+    -d | --delete shortcut           remove entry
+    -r | --rename shortcut shortcut|user|url|port=newValue (ex shortcut=myconnection or url=newdomain.tld/home/test)
+    -s | --scp shortcut              display scp command line for the given shortcut
+""")
+
+#def insert(shortcut, user, url, port):
+    # ici on insère dans la bdd, en vérifiant auparavant qu’on n’ait pas 2 fois le même shortcut
+
+def open_bdd():
+    global conn,cur,bdd
+    # on teste la présence de la base de données.
+    bdd=os.path.expanduser(bdd)
+    if not os.path.isfile(bdd):
+        print("database {} not found !".format(bdd))
+        print("create database (y/n)? ",end="")
+        result=input()
+        if result=='y' or result=='Y':
+            # on commence par créer les dossiers
+            os.makedirs(os.path.dirname(bdd), exist_ok=True)
+            # connexion à la base, si elle n’existe pas, la crée
+            conn=sqlite3.connect(bdd)
+            conn.row_factory = sqlite3.Row
+            # création de la table avec la contrainte sur le shortcut qui doit être unique
+            conn.execute("CREATE TABLE "+table+" ( shortcut text UNIQUE, user text, url text, port integer);")
+            conn.commit()
+            conn.close()
+        else:
+            print("Abandon…")
+            quit()
+
+    conn=sqlite3.connect(bdd)
+    conn.row_factory = sqlite3.Row
+    cur=conn.cursor()
+
+def list_entries():
+    global conn,cur
+    open_bdd()
+    # on liste sous forme de tableau. shortcut user url port
+    cur.execute("select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item")
+    rows=cur.fetchall()
+    row=rows[0]
+    scl=row[0]   # longueur maxi de shortcut
+    if scl != None:
+        if scl < 8 :
+            scl = 8
+
+        usl=row[1]   # longueur maxi de user
+        if usl < 4 :
+            usl = 4
+
+        url=row[2]   # longueur maxi de url
+        if url < 3 :
+            url = 3
+
+        pol=row[3]   # longueur maxi de port
+        if pol < 4 :
+            pol = 4
+
+        separateur="-"*(scl+usl+url+pol+5)
+        fmt="|{shortcut:"+str(scl)+"}|{user:"+str(usl)+"}|{url:"+str(url)+"}|{port:"+str(pol)+"}|"
+
+        cur.execute("select * from item;")
+        rows=cur.fetchall()
+        if len(rows) != 0:
+            print(separateur)
+            print(fmt.format(shortcut="shortcut",user="user",url="url",port="port"))
+            print(separateur)
+            for row in rows:
+                print(fmt.format(shortcut=row["shortcut"],user=row["user"],url=row["URL"],port=row["port"]))
+            print(separateur)
+    else:
+        print("Empty database")
+    conn.close()
+
+def remove_entry(entry):
+    global conn,cur
+    open_bdd()
+    # remove entry from BDD
+    sql="delete from "+table+" where shortcut='"+entry+"';"
+    conn.execute(sql)
+    conn.commit()
+    print("Entry removed !")
+    conn.close()
+
+def add_entry(entry):
+    global conn,cur
+    open_bdd()
+    # format de l’entry shortcut:user@url:port
+    # on doit vérifier si le shortcut n’existe pas déjà
+
+    # Expression régulière pour capturer les groupes (shortcut, user, url, port)
+    pattern = r"^(?P<shortcut>\w+):(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
+
+    # Application de la regex sur l’entrée
+    match = re.match(pattern, entry)
+
+    # Si une correspondance est trouvée, extraire les valeurs dans des variables
+    if match:
+        shortcut = match.group('shortcut')
+        user     = match.group('user')
+        url      = match.group('url')
+        port     = match.group('port')
+        # écriture en bdd
+        sql = "insert into "+table+"(shortcut,user,url,port) values(?,?,?,?);"
+        conn.execute(sql,(shortcut,user,url,port))
+        conn.commit()
+    else:
+        print("Syntax Error !")
+    conn.close()
+
+def rename(shortcut,command):
+    global conn,cur
+    open_bdd()
+    l = command.split("=",1)
+    if len(l) != 2:
+        print("rename not possible")
+    else:
+        field = l[0]
+        value = l[1]
+        if field in ["shortcut","user","url","port"]:
+            if field != "port":
+                value="'"+l[1]+"'"
+            conn.execute(f"update {table} set {field}={value} where shortcut='{shortcut}'")
+            conn.commit()
+        else:
+            print("unknown field")
+    conn.close()
+
+def ssh_exec(shortcut):
+    global conn,cur
+    open_bdd()
+    # on va en bdd chercher le raccourci
+    sql = "select * from " + table + " where shortcut='" + shortcut + "';"
+    cur.execute(sql)
+    rows=cur.fetchall()
+    # on ne doit avoir qu’un seul résultat
+    if len(rows) == 1:
+        row = rows[0]
+        # sépare le chemin dans l’url
+        l=row["URL"].split("/",1)
+        if len(l)==1 :
+            commande = "ssh -p {port} -t {user}@{url}"
+            commande = commande.format(user=row["user"],url=l[0],port=row["port"])
+        else:
+            commande = "ssh -p {port} -t {user}@{url} 'cd /{chemin}; exec $SHELL -l'"
+            commande = commande.format(user=row["user"],url=l[0], chemin=l[1],port=row["port"])
+        # affichage de la commande pour avoir un retour utilisateur
+        print(commande)
+        # exécution de la commande
+        os.system(commande)
+    else:
+        print("shortcut {} not found".format(shortcut))
+    conn.close()
+
+def display_scp(shortcut):
+    global conn,cur
+    open_bdd()
+    # on va en bdd chercher le raccourci
+    sql = "select * from " + table + " where shortcut='" + shortcut + "';"
+    cur.execute(sql)
+    rows=cur.fetchall()
+    # on ne doit avoir qu’un seul résultat
+    if len(rows) == 1:
+        row = rows[0]
+        # sépare le chemin dans l’url
+        l=row["URL"].split("/",1)
+        if len(l)==1 :
+            commande = "scp -P {port} {user}@{url}"
+            commande = commande.format(user=row["user"],url=l[0],port=row["port"])
+        else:
+            commande = "scp -P {port} {user}@{url}:/{chemin}"
+            commande = commande.format(user=row["user"],url=l[0], chemin=l[1],port=row["port"])
+        # affichage de la commande pour avoir un retour utilisateur
+        print(commande)
+    else:
+        print("shortcut {} not found".format(shortcut))
+    conn.close()
+
+# récupération des arguments sur la ligne de commande
+v=sys.argv
+
+# check de la ligne de commande
+if len(v)==3 :
+    if v[1] in ["--add","-a"]:
+        add_entry(v[2])
+    elif v[1] in ["--delete","-d"]:
+        remove_entry(v[2])
+    elif v[1] in ["--scp","-s"]:
+        display_scp(v[2])
+elif len(v)==2:
+        if v[1]=="--list" or v[1]=="-l":
+            list_entries()
+        else:
+            ssh_exec(v[1])
+elif len(v)==4:
+        if v[1]=="--rename" or v[1]=="-r":
+            rename(v[2],v[3])
+else:
+    usage()
+
