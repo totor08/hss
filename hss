@@ -15,7 +15,7 @@ import sqlite3,sys,re,os
 def usage():
     print("""usage :
     -l | --list                      display all bdd entries
-    -a | --add shortcut user@url[/path]:port (ex servlog:foo@bar.tld/var/log:22)
+    -a | --add shortcut user@url[/path]:port (ex servlog foo@bar.tld/var/log:22)
     -d | --delete shortcut           remove entry
     -r | --rename shortcut shortcut|user|url|port=newValue (ex shortcut=myconnection or url=newdomain.tld/home/test)
     -s | --scp shortcut              display scp command line for the given shortcut
