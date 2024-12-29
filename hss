@@ -14,7 +14,7 @@ import sqlite3,sys,re,os
 
 def usage():
     print("""usage :
-    -l | --list                      display all bdd entries
+    -l | --list [pattern]            display all bdd entries. optional pattern : ex c*, ex *a, ex *V*, ex c?al
     -a | --add shortcut user@url[/path]:port (ex servlog foo@bar.tld/var/log:22)
     -d | --delete shortcut           remove entry
     -r | --rename shortcut shortcut|user|url|port=newValue (ex shortcut=myconnection or url=newdomain.tld/home/test)
@@ -56,10 +56,20 @@ def too_much(v,n):
     if len(v)>n:
         print("too much parameters.")
         quit()
+    elif len(v)<n:
+        print("missing parameter(s).")
+        quit()
 
 def list_entries(v):
     global conn,cur
-    too_much(v,2)
+    l=len(v)
+    if l>3:
+        print("too much parameters.")
+        quit()
+    if l==3:
+        pattern=v[2].replace("*","%").replace("?","_")
+    else:
+        pattern="%"
     open_bdd()
     # on liste sous forme de tableau. shortcut user url port
     cur.execute("select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item")
@@ -85,7 +95,7 @@ def list_entries(v):
         separateur="-"*(scl+usl+url+pol+5)
         fmt="|{shortcut:"+str(scl)+"}|{user:"+str(usl)+"}|{url:"+str(url)+"}|{port:"+str(pol)+"}|"
 
-        cur.execute("select * from item;")
+        cur.execute(f"select * from item where shortcut like '{pattern}' order by shortcut;")
         rows=cur.fetchall()
         if len(rows) != 0:
             print(separateur)
@@ -100,7 +110,7 @@ def list_entries(v):
 
 def remove_entry(v):
     global conn,cur
-    too_much(v,2)
+    too_much(v,3)
     open_bdd()
     entry=v[2]
     # remove entry from BDD
