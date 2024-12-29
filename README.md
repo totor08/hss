@@ -24,10 +24,19 @@ les données sont associées à un raccourci qu’on appellera *shortcut* ici.
 
     hss --add ratest user1@nomdedomaine.tld:22
 ici on ajoute dans la base, sous le nom *ratest*, d’une connexion ssh avec l’utilisateur *user1*, vers le domaine *nomdedomaine.tld* en utilisant le port 22.
+si on a besoin d’un dossier de destination autre que le dossier par défaut de l’utilisateur, on peut faire
+
+    hss --add ratest user1@nomdedomaine.tld/home/dossierdesonchoix/sous-dossier:22
+ce qui fera automatiquement une connexion ssh avec changement du dossier à la connexion
 ### lister
 On peut lister la base en faisant
 
     hss --list
+    --------------------------------------------------
+    |shortcut|user |url                         |port|
+    --------------------------------------------------
+    |ratest  |user1|nomdedomaine.tld            |  22|
+    --------------------------------------------------
 Quand on a beaucoup de lignes, on peut utiliser un pattern de sélection
 
     hss --list pattern
@@ -36,8 +45,8 @@ ce **pattern** peut utiliser les wildcard suivants : * pour un groupe de caract�
     hss --list s?ef*
 qui va afficher toutes les données dont la première du *shortcut* est **s** et dont les 3ème et 4ème lettres sont **ef**
 
-## renomage
-il se peut que pour une raison quelconque, on ait besoin de renomer quelque chose dans une entrée. On peut soit supprimer l’entrée et la recréer, soit renommer la partie qu’on aimerait changer.
+## renommage
+il se peut que pour une raison quelconque, on ait besoin de renommer quelque chose dans une entrée. On peut soit supprimer l’entrée et la recréer, soit renommer la partie qu’on aimerait changer.
 Chaque entrée est consituée ainsi : **shortcut**, **user**, **url**, **port** et c’est avec ces noms là qu’on va sélectionner ce qu’on désire changer
 
     hss --rename ratest shortcut=test
