@@ -15,10 +15,11 @@ import sqlite3,sys,re,os
 def usage():
     print("""usage :
     -l | --list                      display all bdd entries
-    -a | --add shortcut:user@url[/path]:port (ex servlog:foo@bar.tld/var/log:22)
+    -a | --add shortcut user@url[/path]:port (ex servlog:foo@bar.tld/var/log:22)
     -d | --delete shortcut           remove entry
     -r | --rename shortcut shortcut|user|url|port=newValue (ex shortcut=myconnection or url=newdomain.tld/home/test)
     -s | --scp shortcut              display scp command line for the given shortcut
+    -h | --help                      display this help
 """)
 
 #def insert(shortcut, user, url, port):
@@ -50,8 +51,15 @@ def open_bdd():
     conn.row_factory = sqlite3.Row
     cur=conn.cursor()
 
-def list_entries():
+def too_much(v,n):
+    # check numbers of parameters
+    if len(v)>n:
+        print("too much parameters.")
+        quit()
+
+def list_entries(v):
     global conn,cur
+    too_much(v,2)
     open_bdd()
     # on liste sous forme de tableau. shortcut user url port
     cur.execute("select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item")
@@ -90,9 +98,11 @@ def list_entries():
         print("Empty database")
     conn.close()
 
-def remove_entry(entry):
+def remove_entry(v):
     global conn,cur
+    too_much(v,2)
     open_bdd()
+    entry=v[2]
     # remove entry from BDD
     sql="delete from "+table+" where shortcut='"+entry+"';"
     conn.execute(sql)
@@ -100,21 +110,24 @@ def remove_entry(entry):
     print("Entry removed !")
     conn.close()
 
-def add_entry(entry):
+def add_entry(v):
     global conn,cur
+    too_much(v,4)
+    entry=v[3]
+    shortcut=v[2]
     open_bdd()
     # format de l’entry shortcut:user@url:port
     # on doit vérifier si le shortcut n’existe pas déjà
 
     # Expression régulière pour capturer les groupes (shortcut, user, url, port)
-    pattern = r"^(?P<shortcut>\w+):(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
+    # pattern = r"^(?P<shortcut>\w+):(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
+    pattern = r"^(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
 
     # Application de la regex sur l’entrée
     match = re.match(pattern, entry)
 
     # Si une correspondance est trouvée, extraire les valeurs dans des variables
     if match:
-        shortcut = match.group('shortcut')
         user     = match.group('user')
         url      = match.group('url')
         port     = match.group('port')
@@ -126,8 +139,11 @@ def add_entry(entry):
         print("Syntax Error !")
     conn.close()
 
-def rename(shortcut,command):
+def rename(v):
     global conn,cur
+    too_much(v,4)
+    shortcut=v[2]
+    command=v[3]
     open_bdd()
     l = command.split("=",1)
     if len(l) != 2:
@@ -144,8 +160,10 @@ def rename(shortcut,command):
             print("unknown field")
     conn.close()
 
-def ssh_exec(shortcut):
+def ssh_exec(v):
     global conn,cur
+    too_much(v,2)
+    shortcut=v[1]
     open_bdd()
     # on va en bdd chercher le raccourci
     sql = "select * from " + table + " where shortcut='" + shortcut + "';"
@@ -170,8 +188,10 @@ def ssh_exec(shortcut):
         print("shortcut {} not found".format(shortcut))
     conn.close()
 
-def display_scp(shortcut):
+def display_scp(v):
     global conn,cur
+    too_much(v,3)
+    shortcut=v[2]
     open_bdd()
     # on va en bdd chercher le raccourci
     sql = "select * from " + table + " where shortcut='" + shortcut + "';"
@@ -198,21 +218,24 @@ def display_scp(shortcut):
 v=sys.argv
 
 # check de la ligne de commande
-if len(v)==3 :
-    if v[1] in ["--add","-a"]:
-        add_entry(v[2])
-    elif v[1] in ["--delete","-d"]:
-        remove_entry(v[2])
-    elif v[1] in ["--scp","-s"]:
-        display_scp(v[2])
-elif len(v)==2:
-        if v[1]=="--list" or v[1]=="-l":
-            list_entries()
-        else:
-            ssh_exec(v[1])
-elif len(v)==4:
-        if v[1]=="--rename" or v[1]=="-r":
-            rename(v[2],v[3])
+if len(v)>1 :
+    c = v[1]
+    if c in ["--add","-a"]:
+        add_entry(v)
+    elif c in ["--delete","-d"]:
+        remove_entry(v)
+    elif c in ["--scp","-s"]:
+        display_scp(v)
+    elif c in ["--list","-l"]:
+        list_entries(v)
+    elif c in ["--help","-h"]:
+        usage()
+    elif c in ["--rename","-r"]:
+        rename(v)
+    elif c[1] != "-":
+        ssh_exec(v)
+    else:
+        usage()
 else:
     usage()
 
