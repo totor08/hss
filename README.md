@@ -13,8 +13,10 @@ et on repère un dossier utilisateur accessible. On y copie hss, puis on fait un
 
     type python
 ce qui renvoie le chemin complet de l’exécutable python, on copie le chemin complet du python.exe (avec le python.exe) et on édite le fichier hss et on remplace la première ligne
+
     #!/usr/bin/python3
 par
+
     #!cheminCompletDeLExecutablePython
 et ainsi on pourra lancer **hss**
 ## utilisation
