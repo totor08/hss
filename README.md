@@ -30,15 +30,31 @@ si on a besoin d’un dossier de destination autre que le dossier par défaut de
 
     hss --add ratest user1@nomdedomaine.tld/home/dossierdesonchoix/sous-dossier:22
 ce qui fera automatiquement une connexion ssh avec changement du dossier à la connexion
+on peut ajouter une url avec une **ipV6**, dans ce cas il faut mettre des crochets autour de l’adresse **ipV6**
+
+    hss --add test6 user1@\[2001:DB8:1200::17\]/home/lxc/vpn:8765
+ici on a ajouté une **ipV6** et en ligne de commande, on doit mettre des \ antislash devant les crochets pour éviter qu’ils soient analysé par l’interpréteur de commandes. Après cette insertion, l’utilisation restera la même que pour une url litérale.
+Il y a une particularité dans le cas des adresse **ipV6**, dans le cas des adresses locales, qui commencent par **FE80**, il faut spécifier la carte réseau par où les trames vont passer. Si en ligne de commande on fait un ping vers l’adresse locale du serveur
+
+    ping fe80::4ecd
+ça va fonctionner, mais si on tente une connexion ssh, ça ne fonctionnera pas.
+Dans mon cas la carte réseau étant **eth0**, la connexion ssh va être
+
+    ssh user@fe80::4ecd%eth0 -p port
+donc on va insérer comme entrée
+
+    hss --add serloc user@\[fe80::4ecd%eth0\]/var/www:258
 ### lister
 On peut lister la base en faisant
 
     hss --list
-    --------------------------------------------------
-    |shortcut|user |url                         |port|
-    --------------------------------------------------
-    |ratest  |user1|nomdedomaine.tld            |  22|
-    --------------------------------------------------
+    ------------------------------------------------------------
+    |shortcut|user |url                                   |port|
+    ------------------------------------------------------------
+    |ratest  |user1|nomdedomaine.tld                      |  22|
+    |serloc  |user |[fe80::4ecd%eth0]/var/www             | 258|
+    |test6   |user1|[2001:DB8:1200::17]/home/lxc/vpn      |8765|
+    ------------------------------------------------------------
 Quand on a beaucoup de lignes, on peut utiliser un pattern de sélection
 
     hss --list pattern
