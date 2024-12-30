@@ -1,14 +1,10 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+# Sqlite3 database location
 bdd = "~/.config/hss/hss.db"
+# table name containing datas
 table = "item"
-
-# format de création de la table
-# CREATE TABLE item ( shortcut text UNIQUE, user text, url text, port integer )
-
-# longueur maxi de chaque data
-# select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item;
 
 import sqlite3,sys,re,os
 
@@ -22,24 +18,21 @@ def usage():
     -h | --help                      display this help
 """)
 
-#def insert(shortcut, user, url, port):
-    # ici on insère dans la bdd, en vérifiant auparavant qu’on n’ait pas 2 fois le même shortcut
-
 def open_bdd():
     global conn,cur,bdd
-    # on teste la présence de la base de données.
+    # check if database is present
     bdd=os.path.expanduser(bdd)
     if not os.path.isfile(bdd):
         print("database {} not found !".format(bdd))
         print("create database (y/n)? ",end="")
         result=input()
         if result=='y' or result=='Y':
-            # on commence par créer les dossiers
+            # creating folder and subfolder
             os.makedirs(os.path.dirname(bdd), exist_ok=True)
-            # connexion à la base, si elle n’existe pas, la crée
+            # database connection, create it if it does’nt exist
             conn=sqlite3.connect(bdd)
             conn.row_factory = sqlite3.Row
-            # création de la table avec la contrainte sur le shortcut qui doit être unique
+            # table creation with constraint on shortcut which must be unique
             conn.execute("CREATE TABLE "+table+" ( shortcut text UNIQUE, user text, url text, port integer);")
             conn.commit()
             conn.close()
@@ -71,24 +64,24 @@ def list_entries(v):
     else:
         pattern="%"
     open_bdd()
-    # on liste sous forme de tableau. shortcut user url port
+    # list shortcut, user, url & port as a table
     cur.execute("select max(length(shortcut)),max(length(user)),max(length(url)),max(length(port)) from item")
     rows=cur.fetchall()
     row=rows[0]
-    scl=row[0]   # longueur maxi de shortcut
+    scl=row[0]   # shortcut max length
     if scl != None:
         if scl < 8 :
             scl = 8
 
-        usl=row[1]   # longueur maxi de user
+        usl=row[1]   # user max length
         if usl < 4 :
             usl = 4
 
-        url=row[2]   # longueur maxi de url
+        url=row[2]   # url max length
         if url < 3 :
             url = 3
 
-        pol=row[3]   # longueur maxi de port
+        pol=row[3]   # port max length
         if pol < 4 :
             pol = 4
 
@@ -126,22 +119,21 @@ def add_entry(v):
     entry=v[3]
     shortcut=v[2]
     open_bdd()
-    # format de l’entry shortcut:user@url:port
-    # on doit vérifier si le shortcut n’existe pas déjà
+    # entry format -> shortcut:user@url:port
+    # does shortcut already exists ?
 
-    # Expression régulière pour capturer les groupes (shortcut, user, url, port)
-    # pattern = r"^(?P<shortcut>\w+):(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
-    pattern = r"^(?P<user>\w+)@(?P<url>[\w\.\/]+):(?P<port>\d+)$"
+    # regex to capture groups (shortcut, user, url, port)
+    pattern = r"^(?P<user>\w+)@(?P<url>.*):(?P<port>\d+)$"
 
-    # Application de la regex sur l’entrée
+    # Apply regex on entry
     match = re.match(pattern, entry)
 
-    # Si une correspondance est trouvée, extraire les valeurs dans des variables
+    # if matching, extract values into variables
     if match:
-        user     = match.group('user')
-        url      = match.group('url')
-        port     = match.group('port')
-        # écriture en bdd
+        user = match.group('user')
+        url  = match.group('url')
+        port = match.group('port')
+        # writing to bdd
         sql = "insert into "+table+"(shortcut,user,url,port) values(?,?,?,?);"
         conn.execute(sql,(shortcut,user,url,port))
         conn.commit()
@@ -175,24 +167,26 @@ def ssh_exec(v):
     too_much(v,2)
     shortcut=v[1]
     open_bdd()
-    # on va en bdd chercher le raccourci
+    # searching for shortcut in database
     sql = "select * from " + table + " where shortcut='" + shortcut + "';"
     cur.execute(sql)
     rows=cur.fetchall()
-    # on ne doit avoir qu’un seul résultat
+    # we must only have one result
     if len(rows) == 1:
         row = rows[0]
-        # sépare le chemin dans l’url
+        # splitting path from url
         l=row["URL"].split("/",1)
+        # if using brackets (ipv6), they are stripped
+        l[0]=l[0].rstrip("]").lstrip("[")
         if len(l)==1 :
             commande = "ssh -p {port} -t {user}@{url}"
             commande = commande.format(user=row["user"],url=l[0],port=row["port"])
         else:
             commande = "ssh -p {port} -t {user}@{url} 'cd /{chemin}; exec $SHELL -l'"
             commande = commande.format(user=row["user"],url=l[0], chemin=l[1],port=row["port"])
-        # affichage de la commande pour avoir un retour utilisateur
+        # display command on screen before executing
         print(commande)
-        # exécution de la commande
+        # execute command
         os.system(commande)
     else:
         print("shortcut {} not found".format(shortcut))
@@ -203,31 +197,33 @@ def display_scp(v):
     too_much(v,3)
     shortcut=v[2]
     open_bdd()
-    # on va en bdd chercher le raccourci
+    # searching for shortcut in database
     sql = "select * from " + table + " where shortcut='" + shortcut + "';"
     cur.execute(sql)
     rows=cur.fetchall()
-    # on ne doit avoir qu’un seul résultat
+    # we must only have one result
     if len(rows) == 1:
         row = rows[0]
-        # sépare le chemin dans l’url
+        # splitting path from url
         l=row["URL"].split("/",1)
+        # if using brackets (ipv6), adding \ before any bracket
+        l[0]=l[0].replace("[","\[").replace("]","\]")
         if len(l)==1 :
             commande = "scp -P {port} {user}@{url}"
             commande = commande.format(user=row["user"],url=l[0],port=row["port"])
         else:
             commande = "scp -P {port} {user}@{url}:/{chemin}"
             commande = commande.format(user=row["user"],url=l[0], chemin=l[1],port=row["port"])
-        # affichage de la commande pour avoir un retour utilisateur
+        # display scp command on screen
         print(commande)
     else:
         print("shortcut {} not found".format(shortcut))
     conn.close()
 
-# récupération des arguments sur la ligne de commande
+# getting arguments from command line
 v=sys.argv
 
-# check de la ligne de commande
+# check commands from arguments
 if len(v)>1 :
     c = v[1]
     if c in ["--add","-a"]:
@@ -242,10 +238,9 @@ if len(v)>1 :
         usage()
     elif c in ["--rename","-r"]:
         rename(v)
-    elif c[1] != "-":
+    elif c[0] != "-":
         ssh_exec(v)
     else:
         usage()
 else:
     usage()
-
